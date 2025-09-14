@@ -56,8 +56,8 @@ def _build_stylesheet(accent: str = "#2F6FEB") -> str:
     QListWidget#Sidebar::item {{ color: #D0D0D0; padding: 10px 12px; margin: 4px 6px; border-radius: 10px; }}
     QListWidget#Sidebar::item:hover {{ background: #1F1F1F; }}
     QListWidget#Sidebar::item:selected {{ background: {accent}; color: #FFFFFF; font-weight: 600; }}
-    QListWidget#Sidebar[compact="true"] { padding: 6px; }
-    QListWidget#Sidebar[compact="true"]::item { padding: 8px; margin: 2px 4px; }
+    QListWidget#Sidebar[compact=\"true\"] {{ padding: 6px; }}
+    QListWidget#Sidebar[compact=\"true\"]::item {{ padding: 8px; margin: 2px 4px; }}
     QSplitter::handle {{ background: #1A1A1A; width: 2px; }}
     QScrollBar:vertical {{ background: #141414; width: 10px; margin: 6px; border-radius: 5px; }}
     QScrollBar::handle:vertical {{ background: {accent}; min-height: 30px; border-radius: 5px; }}
@@ -762,10 +762,7 @@ def setup_highdpi():
             )
     except Exception:
         pass
-    try:
-        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
-    except Exception:
-        pass
+    # Avoid deprecated AA_UseHighDpiPixmaps attribute to prevent warnings
 
 
 def main():
