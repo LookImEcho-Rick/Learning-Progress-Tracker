@@ -746,6 +746,14 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([240, 1200])
+        # Prevent sidebar/content from collapsing
+        try:
+            splitter.setCollapsible(0, False)
+            splitter.setCollapsible(1, False)
+        except Exception:
+            pass
+        # Keep a sensible minimum width for the sidebar
+        self.nav.setMinimumWidth(160)
         self.setCentralWidget(splitter)
         # Keyboard shortcuts (no visible toolbar)
         QShortcut(QKeySequence("Ctrl+N"), self, activated=self._focus_new_entry)
