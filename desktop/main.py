@@ -23,7 +23,12 @@ from services.storage import (
 )
 from services.metrics import compute_streaks, weekly_minutes
 from services.validation import validate_entry_fields, MAX_TOPIC_LEN, MAX_TEXT_LEN, MAX_TAGS, MAX_TAG_LEN
-from services.filesync import create_or_sync_on_launch, register_atexit_export, export_db_to_csv, import_csv_to_db
+from services.filesync import (
+    create_or_sync_on_launch,
+    register_atexit_export,
+    export_db_to_json,
+    import_json_to_db,
+)
 import matplotlib
 matplotlib.use("QtAgg")
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
@@ -264,7 +269,12 @@ class HistoryTab(QtWidgets.QWidget):
         fdf["progress"] = fdf["minutes"].astype(int) * fdf["confidence"].astype(int)
 
         rows = fdf.sort_values("date", ascending=False).reset_index(drop=True)
-        self._hist_df = rows[["date", "topic", "minutes", "confidence", "progress", "tags"]].copy()
+        # Include all entry fields in history view
+        cols = ["date", "topic", "minutes", "confidence", "progress", "tags", "practiced", "challenges", "wins"]
+        for c in ["practiced", "challenges", "wins"]:
+            if c not in rows.columns:
+                rows[c] = ""
+        self._hist_df = rows[cols].copy()
         self.table.setModel(DataFrameModel(self._hist_df))
 
     def _selected_date(self) -> dt.date | None:
@@ -391,8 +401,8 @@ class DataTab(QtWidgets.QWidget):
         v.addWidget(self.table)
 
         hb = QtWidgets.QHBoxLayout()
-        self.export_btn = QtWidgets.QPushButton("Export CSV")
-        self.import_btn = QtWidgets.QPushButton("Import CSV")
+        self.export_btn = QtWidgets.QPushButton("Export JSON")
+        self.import_btn = QtWidgets.QPushButton("Import JSON")
         hb.addWidget(self.export_btn)
         hb.addWidget(self.import_btn)
         v.addLayout(hb)
@@ -408,25 +418,33 @@ class DataTab(QtWidgets.QWidget):
             return
         df = df.sort_values("date", ascending=False).reset_index(drop=True)
         df["progress"] = df["minutes"].astype(int) * df["confidence"].astype(int)
-        self._data_df = df[["date", "topic", "minutes", "confidence", "progress", "tags"]].copy()
+        for c in ["practiced", "challenges", "wins"]:
+            if c not in df.columns:
+                df[c] = ""
+        self._data_df = df[["date", "topic", "minutes", "confidence", "progress", "tags", "practiced", "challenges", "wins"]].copy()
         self.table.setModel(DataFrameModel(self._data_df))
 
     def export_csv(self):
         try:
-            path = export_db_to_csv()
-            QtWidgets.QMessageBox.information(self, "Export", "CSV exported successfully.")
+            path = export_db_to_json()
+            QtWidgets.QMessageBox.information(self, "Export", "JSON exported successfully.")
         except Exception as ex:
             QtWidgets.QMessageBox.critical(self, "Export Failed", str(ex))
 
     def import_csv(self):
         dlg = QtWidgets.QFileDialog(self)
         dlg.setFileMode(QtWidgets.QFileDialog.ExistingFile)
-        dlg.setNameFilter("CSV Files (*.csv)")
+        dlg.setNameFilter("JSON Files (*.json)")
         if dlg.exec():
             path = dlg.selectedFiles()[0]
             # Background validation via dry-run
             try:
-                df = pd.read_csv(path)
+                import json
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if not isinstance(data, list):
+                    raise ValueError("Invalid JSON format: expected a list of entries")
+                df = pd.DataFrame(data)
                 from services.storage import import_dataframe
                 ins, upd, msgs = import_dataframe(df, dry_run=True)
                 fatals = [m for m in msgs if ("required" in m.lower() or "must be" in m.lower() or "missing date" in m.lower())]
@@ -434,7 +452,7 @@ class DataTab(QtWidgets.QWidget):
                     QtWidgets.QMessageBox.critical(self, "Import Failed", "\n".join(fatals[:20]))
                     return
                 # Commit
-                import_dataframe(df, dry_run=False)
+                import_json_to_db(path)
                 self.refresh()
                 QtWidgets.QMessageBox.information(self, "Import", "Import completed.")
             except Exception as ex:
