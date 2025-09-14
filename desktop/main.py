@@ -127,16 +127,7 @@ class LogEntryTab(QtWidgets.QWidget):
         layout.addRow("Challenges", self.challenges_edit)
         layout.addRow("Wins", self.wins_edit)
         layout.addRow("Tags (comma-separated)", self.tags_edit)
-        # Actions row with Save and New
-        hb = QtWidgets.QHBoxLayout()
-        hb.addWidget(self.save_btn)
-        self.new_btn = QtWidgets.QPushButton("New", self)
-        self.new_btn.setToolTip("Clear form for a new entry")
-        self.new_btn.clicked.connect(self.new_entry)
-        hb.addWidget(self.new_btn)
-        actions_row = QtWidgets.QWidget(self)
-        actions_row.setLayout(hb)
-        layout.addRow(actions_row)
+        layout.addRow(self.save_btn)
 
     def save_entry(self):
         date_q = self.date_edit.date()
@@ -509,6 +500,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def _focus_new_entry(self):
         self.nav.setCurrentRow(0)
         try:
+            # Clear form for a fresh entry, then focus
+            if hasattr(self, "log_tab") and hasattr(self.log_tab, "new_entry"):
+                self.log_tab.new_entry()
             self.log_tab.topic_edit.setFocus(Qt.OtherFocusReason)
         except Exception:
             pass
