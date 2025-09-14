@@ -9,7 +9,16 @@ from PySide6 import QtWidgets, QtCore, QtGui
 
 import pandas as pd
 
-from services.storage import init_db, get_all_entries_df, upsert_entry, get_entry_by_date, delete_entry
+from services.storage import (
+    init_db,
+    get_all_entries_df,
+    upsert_entry,
+    get_entry_by_date,
+    delete_entry,
+    get_setting,
+    set_setting,
+)
+from services.metrics import compute_streaks, weekly_minutes
 from services.validation import validate_entry_fields, MAX_TOPIC_LEN, MAX_TEXT_LEN, MAX_TAGS, MAX_TAG_LEN
 from services.filesync import create_or_sync_on_launch, register_atexit_export, export_db_to_csv, import_csv_to_db
 import matplotlib
@@ -373,10 +382,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hist_tab = HistoryTab()
         self.data_tab = DataTab()
         self.insights_tab = InsightsTab()
+        self.settings_tab = SettingsTab()
         tabs.addTab(self.log_tab, "Log Entry")
         tabs.addTab(self.hist_tab, "History")
         tabs.addTab(self.insights_tab, "Insights")
         tabs.addTab(self.data_tab, "Data")
+        tabs.addTab(self.settings_tab, "Settings")
 
 
 class InsightsTab(QtWidgets.QWidget):
@@ -387,6 +398,9 @@ class InsightsTab(QtWidgets.QWidget):
 
     def _build_ui(self):
         v = QtWidgets.QVBoxLayout(self)
+        # Metrics row
+        self.metrics_label = QtWidgets.QLabel("", self)
+        v.addWidget(self.metrics_label)
         # Three figures stacked
         self.fig1 = Figure(figsize=(6, 3), tight_layout=True)
         self.canvas1 = FigureCanvas(self.fig1)
@@ -409,6 +423,13 @@ class InsightsTab(QtWidgets.QWidget):
         df = get_all_entries_df()
         self.fig1.clear(); self.fig2.clear(); self.fig3.clear()
         if df.empty:
+            # Metrics (no data)
+            goal_str = get_setting("weekly_goal_minutes", None) or "0"
+            try:
+                goal = int(goal_str)
+            except Exception:
+                goal = 0
+            self.metrics_label.setText(f"This week: 0/{goal} min · Current streak: 0 · Longest streak: 0")
             for fig in (self.fig1, self.fig2, self.fig3):
                 ax = fig.add_subplot(111)
                 ax.text(0.5, 0.5, "No data yet", ha='center', va='center')
@@ -418,6 +439,16 @@ class InsightsTab(QtWidgets.QWidget):
         # Prep
         df["date"] = pd.to_datetime(df["date"]).dt.date
         df = df.sort_values("date")
+        # Metrics
+        goal_str = get_setting("weekly_goal_minutes", None) or "0"
+        try:
+            goal = int(goal_str)
+        except Exception:
+            goal = 0
+        this_week = weekly_minutes(df)
+        dates = df["date"].tolist()
+        cur_streak, longest = compute_streaks(dates)
+        self.metrics_label.setText(f"This week: {this_week}/{goal} min · Current streak: {cur_streak} · Longest streak: {longest}")
         # Minutes per day (bar)
         ax1 = self.fig1.add_subplot(111)
         ax1.bar(df["date"].astype(str), df["minutes"].astype(int), color="#4C78A8")
@@ -439,6 +470,32 @@ class InsightsTab(QtWidgets.QWidget):
         ax3.tick_params(axis='x', rotation=45)
         # Draw
         self.canvas1.draw(); self.canvas2.draw(); self.canvas3.draw()
+
+
+class SettingsTab(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QtWidgets.QFormLayout(self)
+        self.goal_spin = QtWidgets.QSpinBox(self)
+        self.goal_spin.setRange(0, 10000)
+        self.goal_spin.setSingleStep(10)
+        # Load existing value
+        try:
+            val = int(get_setting("weekly_goal_minutes", "0") or 0)
+        except Exception:
+            val = 0
+        self.goal_spin.setValue(val)
+        save_btn = QtWidgets.QPushButton("Save", self)
+        save_btn.clicked.connect(self.save)
+        layout.addRow("Weekly goal (minutes)", self.goal_spin)
+        layout.addRow(save_btn)
+
+    def save(self):
+        set_setting("weekly_goal_minutes", str(int(self.goal_spin.value())))
+        QtWidgets.QMessageBox.information(self, "Settings", "Saved weekly goal.")
 
 
 def apply_theme(app: QtWidgets.QApplication):
