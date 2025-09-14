@@ -1,7 +1,7 @@
 # Changelog
 
 ## [Unreleased]
-- Nothing yet.
+- Added `openpyxl` dependency to support Excel export used in tests.
 
 ## [0.0.1] - 2025-09-14
 - Project initialized with documentation scaffolding.
