@@ -35,46 +35,56 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 
-def _build_stylesheet(accent: str = "#2F6FEB") -> str:
+def _build_stylesheet(theme: str = "dark", accent: str = "#2F6FEB") -> str:
+    if theme == "light":
+        bg = "#FAFAFA"; fg = "#1F1F1F"; surface = "#FFFFFF"; border = "#E5E5E5"; alt = "#F3F3F3"; header = "#F5F5F7"
+    else:
+        bg = "#121212"; fg = "#EDEDED"; surface = "#1E1E1E"; border = "#2A2A2A"; alt = "#181818"; header = "#1B1B1B"
     return f"""
     * {{ font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial; font-size: 10pt; }}
-    QWidget {{ background-color: #121212; color: #EDEDED; }}
-    QGroupBox {{ border: 1px solid #2A2A2A; border-radius: 10px; margin-top: 10px; }}
+    QWidget {{ background-color: {bg}; color: {fg}; }}
+    QFrame#Card {{ background-color: {surface}; border: 1px solid {border}; border-radius: 14px; }}
+    QLabel[heading="true"] {{ font-size: 14pt; font-weight: 600; padding: 4px 0 8px 0; }}
+    QGroupBox {{ border: 1px solid {border}; border-radius: 10px; margin-top: 10px; }}
     QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
     QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QComboBox {{
-        background-color: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 8px; padding: 6px 8px;
+        background-color: {surface}; border: 1px solid {border}; border-radius: 10px; padding: 8px 10px;
         selection-background-color: {accent}; selection-color: #FFFFFF;
     }}
     QPlainTextEdit, QTextEdit {{ padding: 8px; }}
     QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus, QDateEdit:focus, QComboBox:focus {{
         border: 1px solid {accent};
     }}
-    QPushButton {{ background-color: #2B2B2B; border: 1px solid #2F2F2F; border-radius: 10px; padding: 8px 14px; }}
-    QPushButton:hover {{ background-color: #343434; border-color: #3A3A3A; }}
+    QPushButton {{ background-color: {alt}; border: 1px solid {border}; border-radius: 12px; padding: 8px 14px; }}
+    QPushButton:hover {{ background-color: {header}; border-color: {border}; }}
     QPushButton:pressed {{ background-color: #0E63A6; border-color: #0E63A6; color: #FFFFFF; }}
     QPushButton[accent="true"] {{ background-color: {accent}; border: 1px solid {accent}; color: #FFFFFF; }}
-    QTabWidget::pane {{ border: 1px solid #2A2A2A; border-radius: 12px; padding: 6px; }}
-    QTabBar::tab {{ background: #1B1B1B; border: 1px solid #2A2A2A; padding: 8px 16px; border-top-left-radius: 12px; border-top-right-radius: 12px; margin-right: 4px; }}
-    QTabBar::tab:selected {{ background: #2B2B2B; color: #FFFFFF; }}
-    QHeaderView::section {{ background-color: #1B1B1B; color: #E0E0E0; padding: 8px; border: none; border-bottom: 1px solid #2A2A2A; }}
-    QTableView {{ background-color: #141414; alternate-background-color: #181818; gridline-color: #2A2A2A; selection-background-color: {accent}; selection-color: #FFFFFF; }}
-    QListWidget#Sidebar {{ background: #141414; border: none; padding: 8px; outline: 0; }}
+    QTabWidget::pane {{ border: 1px solid {border}; border-radius: 12px; padding: 6px; }}
+    QTabBar::tab {{ background: {header}; border: 1px solid {border}; padding: 8px 16px; border-top-left-radius: 12px; border-top-right-radius: 12px; margin-right: 4px; }}
+    QTabBar::tab:selected {{ background: {alt}; color: #FFFFFF; }}
+    QHeaderView::section {{ background-color: {header}; color: #E0E0E0; padding: 8px; border: none; border-bottom: 1px solid {border}; }}
+    QTableView {{ background-color: {alt}; alternate-background-color: {surface}; gridline-color: {border}; selection-background-color: {accent}; selection-color: #FFFFFF; }}
+    QListWidget#Sidebar {{ background: {alt}; border: none; padding: 8px; outline: 0; }}
     QListWidget#Sidebar::item {{ color: #D0D0D0; padding: 10px 12px; margin: 4px 6px; border-radius: 10px; }}
-    QListWidget#Sidebar::item:hover {{ background: #1F1F1F; }}
+    QListWidget#Sidebar::item:hover {{ background: {header}; }}
     QListWidget#Sidebar::item:selected {{ background: {accent}; color: #FFFFFF; font-weight: 600; }}
     QListWidget#Sidebar[compact=\"true\"] {{ padding: 6px; }}
     QListWidget#Sidebar[compact=\"true\"]::item {{ padding: 8px; margin: 2px 4px; }}
-    QSplitter::handle {{ background: #1A1A1A; width: 2px; }}
-    QScrollBar:vertical {{ background: #141414; width: 10px; margin: 6px; border-radius: 5px; }}
+    QSplitter::handle {{ background: {header}; width: 2px; }}
+    QScrollBar:vertical {{ background: {alt}; width: 10px; margin: 6px; border-radius: 5px; }}
     QScrollBar::handle:vertical {{ background: {accent}; min-height: 30px; border-radius: 5px; }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-    QScrollBar:horizontal {{ background: #141414; height: 10px; margin: 6px; border-radius: 5px; }}
+    QScrollBar:horizontal {{ background: {alt}; height: 10px; margin: 6px; border-radius: 5px; }}
     QScrollBar::handle:horizontal {{ background: {accent}; min-width: 30px; border-radius: 5px; }}
     QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
-    QSlider::groove:horizontal {{ height: 6px; background: #2A2A2A; border-radius: 3px; }}
+    QSlider::groove:horizontal {{ height: 6px; background: {border}; border-radius: 3px; }}
     QSlider::handle:horizontal {{ background: {accent}; width: 16px; height: 16px; margin: -5px 0; border-radius: 8px; }}
-    QToolTip {{ background-color: #2B2B2B; color: #FFFFFF; border: 1px solid #3A3A3A; padding: 6px; border-radius: 6px; }}
-    QMessageBox {{ background-color: #1E1E1E; }}
+    QToolTip {{ background-color: {header}; color: #FFFFFF; border: 1px solid {border}; padding: 6px; border-radius: 6px; }}
+    QMessageBox {{ background-color: {surface}; }}
+    QCalendarWidget QWidget {{ background-color: {surface}; }}
+    QCalendarWidget QToolButton {{ background: transparent; border: none; color: {fg}; padding: 6px 8px; border-radius: 8px; }}
+    QCalendarWidget QToolButton:hover {{ background: {header}; }}
+    QCalendarWidget QAbstractItemView:enabled {{ selection-background-color: {accent}; selection-color: #FFFFFF; }}
     """
 
 
@@ -84,7 +94,13 @@ class LogEntryTab(QtWidgets.QWidget):
         self._build_ui()
 
     def _build_ui(self):
-        layout = QtWidgets.QFormLayout(self)
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(16, 16, 16, 16)
+        outer.setSpacing(12)
+        heading = QtWidgets.QLabel("Log Today", self); heading.setProperty("heading", True)
+        outer.addWidget(heading)
+        card = QtWidgets.QFrame(self); card.setObjectName("Card")
+        layout = QtWidgets.QFormLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
         layout.setLabelAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
@@ -133,6 +149,7 @@ class LogEntryTab(QtWidgets.QWidget):
         layout.addRow("Wins", self.wins_edit)
         layout.addRow("Tags (comma-separated)", self.tags_edit)
         layout.addRow(self.save_btn)
+        outer.addWidget(card)
 
     def save_entry(self):
         date_q = self.date_edit.date()
@@ -207,12 +224,26 @@ class EntryCalendarWidget(QtWidgets.QCalendarWidget):
             # Draw a rounded badge and topic snippet
             painter.save()
             painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
-            bg = QtGui.QColor(47, 111, 235, 28)
-            painter.fillRect(rect.adjusted(2, 18, -2, -2), bg)
+            bg = QtGui.QColor(47, 111, 235, 34)
+            rounded = rect.adjusted(3, 20, -3, -3)
+            path = QtGui.QPainterPath()
+            path.addRoundedRect(rounded, 8, 8)
+            painter.fillPath(path, bg)
             painter.setPen(QtGui.QPen(QtGui.QColor(47, 111, 235)))
             topic = str(self._entries[d].get("topic", "")).strip()
-            snippet = topic[:18] + ("…" if len(topic) > 18 else "")
-            painter.drawText(rect.adjusted(6, 24, -6, -4), Qt.TextWordWrap, snippet)
+            snippet = topic[:22] + ("…" if len(topic) > 22 else "")
+            painter.drawText(rounded.adjusted(6, 4, -6, -4), Qt.TextWordWrap, snippet)
+            # Confidence dot
+            try:
+                conf = int(self._entries[d].get("confidence", 0))
+            except Exception:
+                conf = 0
+            if conf:
+                colors = {1: QtGui.QColor(220, 76, 70), 2: QtGui.QColor(244, 154, 52), 3: QtGui.QColor(255, 204, 0), 4: QtGui.QColor(76, 175, 80), 5: QtGui.QColor(67, 160, 71)}
+                dot = QtCore.QRect(rounded.right()-12, rounded.top()-12, 10, 10)
+                painter.setBrush(colors.get(conf, QtGui.QColor(47,111,235)))
+                painter.setPen(QtCore.Qt.NoPen)
+                painter.drawEllipse(dot)
             painter.restore()
 
 
@@ -226,6 +257,8 @@ class HistoryTab(QtWidgets.QWidget):
         root = QtWidgets.QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
+        heading = QtWidgets.QLabel("History", self); heading.setProperty("heading", True)
+        root.addWidget(heading)
 
         # Controls
         ctrl = QtWidgets.QHBoxLayout()
@@ -240,12 +273,16 @@ class HistoryTab(QtWidgets.QWidget):
 
         # Split calendar and side panel
         split = QtWidgets.QSplitter(self)
-        self.calendar = EntryCalendarWidget(self)
+        # Calendar card
+        cal_card = QtWidgets.QFrame(self); cal_card.setObjectName("Card")
+        cal_v = QtWidgets.QVBoxLayout(cal_card); cal_v.setContentsMargins(8,8,8,8)
+        self.calendar = EntryCalendarWidget(cal_card)
         self.calendar.selectionChanged.connect(self._on_day_selected)
-        split.addWidget(self.calendar)
+        cal_v.addWidget(self.calendar)
+        split.addWidget(cal_card)
 
-        right = QtWidgets.QWidget(self)
-        rlayout = QtWidgets.QVBoxLayout(right); rlayout.setSpacing(8)
+        right = QtWidgets.QFrame(self); right.setObjectName("Card")
+        rlayout = QtWidgets.QVBoxLayout(right); rlayout.setSpacing(8); rlayout.setContentsMargins(12,12,12,12)
         self.details_btn = QtWidgets.QPushButton("View Details", right)
         self.edit_btn = QtWidgets.QPushButton("Edit", right)
         self.delete_btn = QtWidgets.QPushButton("Delete", right)
@@ -509,21 +546,26 @@ class DataTab(QtWidgets.QWidget):
         v = QtWidgets.QVBoxLayout(self)
         v.setContentsMargins(16, 16, 16, 16)
         v.setSpacing(12)
-        self.table = QtWidgets.QTableView(self)
+        heading = QtWidgets.QLabel("Data", self); heading.setProperty("heading", True)
+        v.addWidget(heading)
+        card = QtWidgets.QFrame(self); card.setObjectName("Card")
+        card_layout = QtWidgets.QVBoxLayout(card)
+        self.table = QtWidgets.QTableView(card)
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.table.setSortingEnabled(True)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
-        v.addWidget(self.table)
+        card_layout.addWidget(self.table)
 
         hb = QtWidgets.QHBoxLayout()
         self.export_btn = QtWidgets.QPushButton("Export JSON")
         self.import_btn = QtWidgets.QPushButton("Import JSON")
         hb.addWidget(self.export_btn)
         hb.addWidget(self.import_btn)
-        v.addLayout(hb)
+        card_layout.addLayout(hb)
+        v.addWidget(card)
 
         self.export_btn.clicked.connect(self.export_csv)
         self.import_btn.clicked.connect(self.import_csv)
@@ -820,6 +862,8 @@ class SettingsTab(QtWidgets.QWidget):
 
     def _build_ui(self):
         layout = QtWidgets.QFormLayout(self)
+        heading = QtWidgets.QLabel("Settings", self); heading.setProperty("heading", True)
+        layout.addRow(heading)
         self.goal_spin = QtWidgets.QSpinBox(self)
         self.goal_spin.setRange(0, 10000)
         self.goal_spin.setSingleStep(10)
@@ -838,14 +882,29 @@ class SettingsTab(QtWidgets.QWidget):
             compact_pref = False
         self.compact_chk.setChecked(compact_pref)
         self.compact_chk.toggled.connect(self._main._toggle_sidebar_compact)
+        # Theme selection
+        self.theme_combo = QtWidgets.QComboBox(self)
+        self.theme_combo.addItems(["Dark", "Light"])
+        try:
+            current = (get_setting("theme", "dark") or "dark").lower()
+            self.theme_combo.setCurrentIndex(1 if current == "light" else 0)
+        except Exception:
+            pass
         save_btn = QtWidgets.QPushButton("Save", self)
         save_btn.clicked.connect(self.save)
         layout.addRow("Weekly goal (minutes)", self.goal_spin)
         layout.addRow(self.compact_chk)
+        layout.addRow("Theme", self.theme_combo)
         layout.addRow(save_btn)
 
     def save(self):
         set_setting("weekly_goal_minutes", str(int(self.goal_spin.value())))
+        # Save theme and apply immediately
+        theme = "light" if self.theme_combo.currentIndex() == 1 else "dark"
+        set_setting("theme", theme)
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            apply_theme(app)
         QtWidgets.QMessageBox.information(self, "Settings", "Saved weekly goal.")
 
 
@@ -887,24 +946,39 @@ class DataFrameModel(QAbstractTableModel):
 
 def apply_theme(app: QtWidgets.QApplication):
     app.setStyle("Fusion")
-    dark = QtGui.QPalette()
-    dark.setColor(QtGui.QPalette.Window, QtGui.QColor(18, 18, 18))
-    dark.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.Base, QtGui.QColor(20, 20, 20))
-    dark.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(24, 24, 24))
-    dark.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.Button, QtGui.QColor(32, 32, 32))
-    dark.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-    dark.setColor(QtGui.QPalette.Link, QtGui.QColor(47, 111, 235))
-    dark.setColor(QtGui.QPalette.Highlight, QtGui.QColor(47, 111, 235))
-    dark.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
-    app.setPalette(dark)
+    # Determine theme from settings
+    theme = "dark"
+    try:
+        theme = (get_setting("theme", "dark") or "dark").lower()
+        if theme not in ("dark", "light"):
+            theme = "dark"
+    except Exception:
+        theme = "dark"
+    pal = QtGui.QPalette()
+    if theme == "light":
+        pal.setColor(QtGui.QPalette.Window, QtGui.QColor(250, 250, 250))
+        pal.setColor(QtGui.QPalette.WindowText, QtCore.Qt.black)
+        pal.setColor(QtGui.QPalette.Base, QtGui.QColor(255, 255, 255))
+        pal.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(243, 243, 243))
+        pal.setColor(QtGui.QPalette.Text, QtCore.Qt.black)
+        pal.setColor(QtGui.QPalette.Button, QtGui.QColor(245, 245, 247))
+        pal.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.black)
+        pal.setColor(QtGui.QPalette.Highlight, QtGui.QColor(47, 111, 235))
+        pal.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
+    else:
+        pal.setColor(QtGui.QPalette.Window, QtGui.QColor(18, 18, 18))
+        pal.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
+        pal.setColor(QtGui.QPalette.Base, QtGui.QColor(20, 20, 20))
+        pal.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(24, 24, 24))
+        pal.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
+        pal.setColor(QtGui.QPalette.Button, QtGui.QColor(32, 32, 32))
+        pal.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
+        pal.setColor(QtGui.QPalette.Highlight, QtGui.QColor(47, 111, 235))
+        pal.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
+    app.setPalette(pal)
     # Font and stylesheet for a modern rounded look
     app.setFont(QtGui.QFont("Segoe UI", 10))
-    app.setStyleSheet(_build_stylesheet("#2F6FEB"))
+    app.setStyleSheet(_build_stylesheet(theme, "#2F6FEB"))
 
 
 def setup_highdpi():
