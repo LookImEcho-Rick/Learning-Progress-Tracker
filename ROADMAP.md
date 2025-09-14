@@ -1,14 +1,14 @@
 # Roadmap
 
 ## Now
-- [ ] Core app with logging, history, insights, and data persistence.
-- [ ] Export to CSV/XLSX.
 - [ ] Documentation and auto-update flow.
+- [ ] Add more tests (charts, inputs validation).
+- [ ] Basic UI polish and help text.
 
 ## Next
-- [ ] Streaks tracker (consecutive study days).
-- [ ] Tags for entries and tag-based filtering.
-- [ ] Goal targets (e.g., 7 hrs/week).
+- [ ] CSV import (merge by date).
+- [ ] Input validation and error states.
+ - [ ] Input validation and error states.
 
 ## Later
 - [ ] Theming (dark/light/system).

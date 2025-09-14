@@ -19,10 +19,10 @@ Whenever the agent adds or modifies code, it must:
 - `CHANGELOG.md`
 
 ## Coding Standards
-- Python 3.10+  
-- Streamlit for UI  
-- SQLite for persistence  
-- Visualizations via Altair/Plotly  
+- Python 3.10+
+- PySide6 for desktop UI
+- SQLite for persistence
+- Visualizations via Matplotlib
 
 ## Project Rules
 - On launch: auto-load saved data or initialize a new DB.
