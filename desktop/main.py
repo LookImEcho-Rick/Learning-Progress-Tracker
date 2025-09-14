@@ -6,7 +6,8 @@ if ROOT not in sys.path:
 import datetime as dt
 
 from PySide6 import QtWidgets, QtCore, QtGui
-from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QPropertyAnimation
+from PySide6.QtWidgets import QGraphicsOpacityEffect
 
 import pandas as pd
 
@@ -55,6 +56,8 @@ def _build_stylesheet(accent: str = "#2F6FEB") -> str:
     QListWidget#Sidebar::item {{ color: #D0D0D0; padding: 10px 12px; margin: 4px 6px; border-radius: 10px; }}
     QListWidget#Sidebar::item:hover {{ background: #1F1F1F; }}
     QListWidget#Sidebar::item:selected {{ background: {accent}; color: #FFFFFF; font-weight: 600; }}
+    QListWidget#Sidebar[compact="true"] { padding: 6px; }
+    QListWidget#Sidebar[compact="true"]::item { padding: 8px; margin: 2px 4px; }
     QSplitter::handle {{ background: #1A1A1A; width: 2px; }}
     QScrollBar:vertical {{ background: #141414; width: 10px; margin: 6px; border-radius: 5px; }}
     QScrollBar::handle:vertical {{ background: {accent}; min-height: 30px; border-radius: 5px; }}
@@ -456,7 +459,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.insights_tab = InsightsTab(); self.pages.addWidget(self.insights_tab)
         self.data_tab = DataTab(); self.pages.addWidget(self.data_tab)
         self.settings_tab = SettingsTab(); self.pages.addWidget(self.settings_tab)
-        self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.nav.currentRowChanged.connect(self._navigate_to)
         self.nav.setCurrentRow(0)
         splitter = QtWidgets.QSplitter(self)
         splitter.addWidget(self.nav)
@@ -473,7 +476,17 @@ class MainWindow(QtWidgets.QMainWindow):
         act_export = QtGui.QAction("Export CSV", self); act_export.setShortcut("Ctrl+E"); act_export.triggered.connect(self.data_tab.export_csv)
         act_import = QtGui.QAction("Import CSV", self); act_import.setShortcut("Ctrl+I"); act_import.triggered.connect(self.data_tab.import_csv)
         act_refresh = QtGui.QAction("Refresh", self); act_refresh.setShortcut("F5"); act_refresh.triggered.connect(self._refresh_current)
-        tb.addAction(act_new); tb.addAction(act_export); tb.addAction(act_import); tb.addAction(act_refresh)
+        act_compact = QtGui.QAction("Compact Sidebar", self); act_compact.setCheckable(True); act_compact.toggled.connect(self._toggle_sidebar_compact)
+        # Load saved preference
+        try:
+            s = QtCore.QSettings("LPT", "LearningProgressTracker")
+            compact_pref = bool(int(s.value("ui/compactSidebar", "0")))
+        except Exception:
+            compact_pref = False
+        act_compact.setChecked(compact_pref)
+        tb.addAction(act_new); tb.addAction(act_export); tb.addAction(act_import); tb.addAction(act_refresh); tb.addAction(act_compact)
+        # Apply initial compact state
+        self._toggle_sidebar_compact(compact_pref)
         # Status bar
         self.status = self.statusBar()
         self.status.showMessage("Ready")
@@ -496,6 +509,51 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.insights_tab.refresh()
             elif idx == 3:
                 self.data_tab.refresh()
+        except Exception:
+            pass
+
+    def _navigate_to(self, idx: int):
+        # Animate fade-in transition on page change
+        try:
+            widget = self.pages.widget(idx)
+            eff = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(eff)
+            anim = QPropertyAnimation(eff, b"opacity", self)
+            anim.setDuration(150)
+            anim.setStartValue(0.0)
+            anim.setEndValue(1.0)
+            self.pages.setCurrentIndex(idx)
+            anim.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+        except Exception:
+            self.pages.setCurrentIndex(idx)
+
+    def _toggle_sidebar_compact(self, compact: bool):
+        try:
+            if not hasattr(self, "_nav_names"):
+                self._nav_names = [self.nav.item(i).text() for i in range(self.nav.count())]
+            if compact:
+                for i in range(self.nav.count()):
+                    it = self.nav.item(i)
+                    it.setToolTip(self._nav_names[i])
+                    it.setText("")
+                self.nav.setFixedWidth(64)
+                self.nav.setProperty("compact", True)
+            else:
+                for i in range(self.nav.count()):
+                    self.nav.item(i).setText(self._nav_names[i])
+                    self.nav.item(i).setToolTip("")
+                self.nav.setFixedWidth(240)
+                self.nav.setProperty("compact", False)
+            # Save preference
+            try:
+                s = QtCore.QSettings("LPT", "LearningProgressTracker")
+                s.setValue("ui/compactSidebar", "1" if compact else "0")
+            except Exception:
+                pass
+            # Refresh style for property-based selector
+            self.nav.style().unpolish(self.nav)
+            self.nav.style().polish(self.nav)
+            self.nav.update()
         except Exception:
             pass
 
@@ -718,11 +776,12 @@ def main():
     app = QtWidgets.QApplication(sys.argv)
     apply_theme(app)
     win = MainWindow()
-    # Load saved size if any; otherwise launch at 1920x1080
-    loaded = win._load_window_state()
+    # Ensure windowed (not maximized/fullscreen), then size
+    win.setWindowState(Qt.WindowNoState)
+    loaded = win._load_window_state()  # Load saved size if any
     if not loaded:
         win.resize(1920, 1080)
-    win.show()
+    win.showNormal()
     sys.exit(app.exec())
 
 
