@@ -51,6 +51,11 @@ def _build_stylesheet(accent: str = "#2F6FEB") -> str:
     QTabBar::tab:selected {{ background: #2B2B2B; color: #FFFFFF; }}
     QHeaderView::section {{ background-color: #1B1B1B; color: #E0E0E0; padding: 8px; border: none; border-bottom: 1px solid #2A2A2A; }}
     QTableView {{ background-color: #141414; alternate-background-color: #181818; gridline-color: #2A2A2A; selection-background-color: {accent}; selection-color: #FFFFFF; }}
+    QListWidget#Sidebar {{ background: #141414; border: none; padding: 8px; outline: 0; }}
+    QListWidget#Sidebar::item {{ color: #D0D0D0; padding: 10px 12px; margin: 4px 6px; border-radius: 10px; }}
+    QListWidget#Sidebar::item:hover {{ background: #1F1F1F; }}
+    QListWidget#Sidebar::item:selected {{ background: {accent}; color: #FFFFFF; font-weight: 600; }}
+    QSplitter::handle {{ background: #1A1A1A; width: 2px; }}
     QScrollBar:vertical {{ background: #141414; width: 10px; margin: 6px; border-radius: 5px; }}
     QScrollBar::handle:vertical {{ background: {accent}; min-height: 30px; border-radius: 5px; }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
@@ -428,10 +433,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Learning Progress Tracker")
         # Sidebar navigation + stacked pages
         self.nav = QtWidgets.QListWidget(self)
+        self.nav.setObjectName("Sidebar")
         self.nav.setIconSize(QtCore.QSize(20, 20))
         self.nav.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        for name in ["Log Entry", "History", "Insights", "Data", "Settings"]:
-            self.nav.addItem(name)
+        self.nav.setUniformItemSizes(True)
+        self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.nav.setFrameShape(QtWidgets.QFrame.NoFrame)
+        names = ["Log Entry", "History", "Insights", "Data", "Settings"]
+        icons = [
+            self.style().standardIcon(QtWidgets.QStyle.SP_FileIcon),
+            self.style().standardIcon(QtWidgets.QStyle.SP_FileDialogDetailedView),
+            self.style().standardIcon(QtWidgets.QStyle.SP_ComputerIcon),
+            self.style().standardIcon(QtWidgets.QStyle.SP_DirIcon),
+            self.style().standardIcon(QtWidgets.QStyle.SP_DialogYesButton),
+        ]
+        for name, icon in zip(names, icons):
+            item = QtWidgets.QListWidgetItem(icon, name)
+            self.nav.addItem(item)
         self.pages = QtWidgets.QStackedWidget(self)
         self.log_tab = LogEntryTab(); self.pages.addWidget(self.log_tab)
         self.hist_tab = HistoryTab(); self.pages.addWidget(self.hist_tab)
@@ -445,6 +463,7 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter.addWidget(self.pages)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setSizes([240, 1200])
         self.setCentralWidget(splitter)
         # Toolbar
         tb = QtWidgets.QToolBar("Main", self)
@@ -458,8 +477,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Status bar
         self.status = self.statusBar()
         self.status.showMessage("Ready")
-        # Persist window geometry
-        self._load_window_state()
+        # Mark window state not yet loaded; main() decides default size vs saved
+        self._state_loaded = False
 
     def _focus_new_entry(self):
         self.nav.setCurrentRow(0)
@@ -480,7 +499,7 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-    def _load_window_state(self):
+    def _load_window_state(self) -> bool:
         try:
             s = QtCore.QSettings("LPT", "LearningProgressTracker")
             geo = s.value("win/geometry")
@@ -489,8 +508,10 @@ class MainWindow(QtWidgets.QMainWindow):
             state = s.value("win/state")
             if state:
                 self.restoreState(state)
+            self._state_loaded = bool(geo or state)
+            return self._state_loaded
         except Exception:
-            pass
+            return False
 
     def closeEvent(self, event):
         try:
@@ -697,7 +718,10 @@ def main():
     app = QtWidgets.QApplication(sys.argv)
     apply_theme(app)
     win = MainWindow()
-    win.resize(1000, 700)
+    # Load saved size if any; otherwise launch at 1920x1080
+    loaded = win._load_window_state()
+    if not loaded:
+        win.resize(1920, 1080)
     win.show()
     sys.exit(app.exec())
 
