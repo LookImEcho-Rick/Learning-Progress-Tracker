@@ -27,6 +27,42 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 
+def _build_stylesheet(accent: str = "#2F6FEB") -> str:
+    return f"""
+    * {{ font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial; font-size: 10pt; }}
+    QWidget {{ background-color: #121212; color: #EDEDED; }}
+    QGroupBox {{ border: 1px solid #2A2A2A; border-radius: 10px; margin-top: 10px; }}
+    QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 4px; }}
+    QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QDoubleSpinBox, QDateEdit, QComboBox {{
+        background-color: #1E1E1E; border: 1px solid #2A2A2A; border-radius: 8px; padding: 6px 8px;
+        selection-background-color: {accent}; selection-color: #FFFFFF;
+    }}
+    QPlainTextEdit, QTextEdit {{ padding: 8px; }}
+    QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus, QDateEdit:focus, QComboBox:focus {{
+        border: 1px solid {accent};
+    }}
+    QPushButton {{ background-color: #2B2B2B; border: 1px solid #2F2F2F; border-radius: 10px; padding: 8px 14px; }}
+    QPushButton:hover {{ background-color: #343434; border-color: #3A3A3A; }}
+    QPushButton:pressed {{ background-color: #0E63A6; border-color: #0E63A6; color: #FFFFFF; }}
+    QPushButton[accent="true"] {{ background-color: {accent}; border: 1px solid {accent}; color: #FFFFFF; }}
+    QTabWidget::pane {{ border: 1px solid #2A2A2A; border-radius: 12px; padding: 6px; }}
+    QTabBar::tab {{ background: #1B1B1B; border: 1px solid #2A2A2A; padding: 8px 16px; border-top-left-radius: 12px; border-top-right-radius: 12px; margin-right: 4px; }}
+    QTabBar::tab:selected {{ background: #2B2B2B; color: #FFFFFF; }}
+    QHeaderView::section {{ background-color: #1B1B1B; color: #E0E0E0; padding: 8px; border: none; border-bottom: 1px solid #2A2A2A; }}
+    QTableView {{ background-color: #141414; alternate-background-color: #181818; gridline-color: #2A2A2A; selection-background-color: {accent}; selection-color: #FFFFFF; }}
+    QScrollBar:vertical {{ background: #141414; width: 10px; margin: 6px; border-radius: 5px; }}
+    QScrollBar::handle:vertical {{ background: {accent}; min-height: 30px; border-radius: 5px; }}
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+    QScrollBar:horizontal {{ background: #141414; height: 10px; margin: 6px; border-radius: 5px; }}
+    QScrollBar::handle:horizontal {{ background: {accent}; min-width: 30px; border-radius: 5px; }}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
+    QSlider::groove:horizontal {{ height: 6px; background: #2A2A2A; border-radius: 3px; }}
+    QSlider::handle:horizontal {{ background: {accent}; width: 16px; height: 16px; margin: -5px 0; border-radius: 8px; }}
+    QToolTip {{ background-color: #2B2B2B; color: #FFFFFF; border: 1px solid #3A3A3A; padding: 6px; border-radius: 6px; }}
+    QMessageBox {{ background-color: #1E1E1E; }}
+    """
+
+
 class LogEntryTab(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -34,6 +70,10 @@ class LogEntryTab(QtWidgets.QWidget):
 
     def _build_ui(self):
         layout = QtWidgets.QFormLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+        layout.setLabelAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        layout.setFieldGrowthPolicy(QtWidgets.QFormLayout.AllNonFixedFieldsGrow)
 
         self.date_edit = QtWidgets.QDateEdit(self)
         self.date_edit.setCalendarPopup(True)
@@ -41,23 +81,33 @@ class LogEntryTab(QtWidgets.QWidget):
 
         self.topic_edit = QtWidgets.QLineEdit(self)
         self.topic_edit.setMaxLength(MAX_TOPIC_LEN)
+        self.topic_edit.setPlaceholderText("e.g., Algorithms, React hooks, SQL joins")
+        self.topic_edit.setToolTip("Short title for what you studied today")
 
         self.minutes_spin = QtWidgets.QSpinBox(self)
         self.minutes_spin.setRange(0, 1440)
         self.minutes_spin.setSingleStep(5)
+        self.minutes_spin.setToolTip("How many minutes you studied")
 
         self.conf_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal, self)
         self.conf_slider.setRange(1, 5)
         self.conf_slider.setValue(3)
+        self.conf_slider.setToolTip("Confidence level for today (1-5)")
 
         self.practiced_edit = QtWidgets.QPlainTextEdit(self)
+        self.practiced_edit.setPlaceholderText("What you practiced…")
         self.challenges_edit = QtWidgets.QPlainTextEdit(self)
+        self.challenges_edit.setPlaceholderText("Any blockers or challenges…")
         self.wins_edit = QtWidgets.QPlainTextEdit(self)
+        self.wins_edit.setPlaceholderText("Wins, insights, or notes…")
         self.tags_edit = QtWidgets.QLineEdit(self)
         self.tags_edit.setMaxLength(MAX_TAGS * (MAX_TAG_LEN + 2))
+        self.tags_edit.setPlaceholderText("e.g., python, data, leetcode")
+        self.tags_edit.setToolTip("Comma-separated tags (up to 10)")
 
         self.save_btn = QtWidgets.QPushButton("Save Entry", self)
         self.save_btn.clicked.connect(self.save_entry)
+        self.save_btn.setProperty("accent", True)
 
         layout.addRow("Date", self.date_edit)
         layout.addRow("Topic", self.topic_edit)
@@ -118,7 +168,10 @@ class HistoryTab(QtWidgets.QWidget):
 
     def _build_ui(self):
         vbox = QtWidgets.QVBoxLayout(self)
+        vbox.setContentsMargins(16, 16, 16, 16)
+        vbox.setSpacing(12)
         filters = QtWidgets.QHBoxLayout()
+        filters.setSpacing(8)
 
         self.start_date = QtWidgets.QDateEdit(self)
         self.start_date.setCalendarPopup(True)
@@ -146,6 +199,8 @@ class HistoryTab(QtWidgets.QWidget):
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.table.setSortingEnabled(True)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
 
         self.edit_btn = QtWidgets.QPushButton("Edit Selected", self)
         self.delete_btn = QtWidgets.QPushButton("Delete Selected", self)
@@ -247,6 +302,7 @@ class EditDialog(QtWidgets.QDialog):
         self.date_label = QtWidgets.QLabel(str(d), self)
         self.topic_edit = QtWidgets.QLineEdit(self.row["topic"] or "", self)
         self.topic_edit.setMaxLength(MAX_TOPIC_LEN)
+        self.topic_edit.setPlaceholderText("e.g., Algorithms, React hooks, SQL joins")
         self.minutes = QtWidgets.QSpinBox(self); self.minutes.setRange(0,1440); self.minutes.setValue(int(self.row["minutes"]))
         self.conf = QtWidgets.QSlider(QtCore.Qt.Horizontal, self); self.conf.setRange(1,5); self.conf.setValue(int(self.row["confidence"]))
         self.prac = QtWidgets.QPlainTextEdit(self.row["practiced"] or "", self)
@@ -254,6 +310,7 @@ class EditDialog(QtWidgets.QDialog):
         self.wins = QtWidgets.QPlainTextEdit(self.row["wins"] or "", self)
         self.tags = QtWidgets.QLineEdit(self.row["tags"] or "", self)
         self.tags.setMaxLength(MAX_TAGS * (MAX_TAG_LEN + 2))
+        self.tags.setPlaceholderText("e.g., python, data, leetcode")
         btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Save | QtWidgets.QDialogButtonBox.Cancel, self)
         btns.accepted.connect(self.save)
         btns.rejected.connect(self.reject)
@@ -308,6 +365,8 @@ class DataTab(QtWidgets.QWidget):
 
     def _build_ui(self):
         v = QtWidgets.QVBoxLayout(self)
+        v.setContentsMargins(16, 16, 16, 16)
+        v.setSpacing(12)
         self.table = QtWidgets.QTableWidget(self)
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels(["Date", "Topic", "Minutes", "Confidence", "Progress", "Tags"])
@@ -315,6 +374,8 @@ class DataTab(QtWidgets.QWidget):
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         self.table.setSortingEnabled(True)
+        self.table.setAlternatingRowColors(True)
+        self.table.verticalHeader().setVisible(False)
         v.addWidget(self.table)
 
         hb = QtWidgets.QHBoxLayout()
@@ -326,6 +387,7 @@ class DataTab(QtWidgets.QWidget):
 
         self.export_btn.clicked.connect(self.export_csv)
         self.import_btn.clicked.connect(self.import_csv)
+        self.import_btn.setProperty("accent", True)
 
     def refresh(self):
         df = get_all_entries_df()
@@ -398,6 +460,8 @@ class InsightsTab(QtWidgets.QWidget):
 
     def _build_ui(self):
         v = QtWidgets.QVBoxLayout(self)
+        v.setContentsMargins(16, 16, 16, 16)
+        v.setSpacing(12)
         # Metrics row
         self.metrics_label = QtWidgets.QLabel("", self)
         v.addWidget(self.metrics_label)
@@ -501,20 +565,23 @@ class SettingsTab(QtWidgets.QWidget):
 def apply_theme(app: QtWidgets.QApplication):
     app.setStyle("Fusion")
     dark = QtGui.QPalette()
-    dark.setColor(QtGui.QPalette.Window, QtGui.QColor(53, 53, 53))
+    dark.setColor(QtGui.QPalette.Window, QtGui.QColor(18, 18, 18))
     dark.setColor(QtGui.QPalette.WindowText, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.Base, QtGui.QColor(35, 35, 35))
-    dark.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(53, 53, 53))
+    dark.setColor(QtGui.QPalette.Base, QtGui.QColor(20, 20, 20))
+    dark.setColor(QtGui.QPalette.AlternateBase, QtGui.QColor(24, 24, 24))
     dark.setColor(QtGui.QPalette.ToolTipBase, QtCore.Qt.white)
     dark.setColor(QtGui.QPalette.ToolTipText, QtCore.Qt.white)
     dark.setColor(QtGui.QPalette.Text, QtCore.Qt.white)
-    dark.setColor(QtGui.QPalette.Button, QtGui.QColor(53, 53, 53))
+    dark.setColor(QtGui.QPalette.Button, QtGui.QColor(32, 32, 32))
     dark.setColor(QtGui.QPalette.ButtonText, QtCore.Qt.white)
     dark.setColor(QtGui.QPalette.BrightText, QtCore.Qt.red)
-    dark.setColor(QtGui.QPalette.Link, QtGui.QColor(42, 130, 218))
-    dark.setColor(QtGui.QPalette.Highlight, QtGui.QColor(42, 130, 218))
-    dark.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.black)
+    dark.setColor(QtGui.QPalette.Link, QtGui.QColor(47, 111, 235))
+    dark.setColor(QtGui.QPalette.Highlight, QtGui.QColor(47, 111, 235))
+    dark.setColor(QtGui.QPalette.HighlightedText, QtCore.Qt.white)
     app.setPalette(dark)
+    # Font and stylesheet for a modern rounded look
+    app.setFont(QtGui.QFont("Segoe UI", 10))
+    app.setStyleSheet(_build_stylesheet("#2F6FEB"))
 
 
 def setup_highdpi():
