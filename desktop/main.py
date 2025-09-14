@@ -8,7 +8,7 @@ import datetime as dt
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QPropertyAnimation
 from PySide6.QtGui import QShortcut, QKeySequence
-from PySide6.QtWidgets import QGraphicsOpacityEffect
+from PySide6.QtWidgets import QGraphicsOpacityEffect, QGraphicsDropShadowEffect
 
 import pandas as pd
 
@@ -85,7 +85,89 @@ def _build_stylesheet(theme: str = "dark", accent: str = "#2F6FEB") -> str:
     QCalendarWidget QToolButton {{ background: transparent; border: none; color: {fg}; padding: 6px 8px; border-radius: 8px; }}
     QCalendarWidget QToolButton:hover {{ background: {header}; }}
     QCalendarWidget QAbstractItemView:enabled {{ selection-background-color: {accent}; selection-color: #FFFFFF; }}
+    QLabel#Chip {{
+        background: rgba(255,255,255,0.06);
+        border: 1px solid {border};
+        border-radius: 12px;
+        padding: 4px 8px;
+        color: {fg};
+    }}
     """
+
+
+class FlowLayout(QtWidgets.QLayout):
+    def __init__(self, parent=None, margin=0, spacing=6):
+        super().__init__(parent)
+        self._items: list[QtWidgets.QLayoutItem] = []
+        self.setContentsMargins(margin, margin, margin, margin)
+        self._spacing = spacing
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index):
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):
+        return Qt.Orientations(Qt.Orientation(0))
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self._do_layout(QtCore.QRect(0, 0, width, 0), True)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._do_layout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QtCore.QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        left, top, right, bottom = self.getContentsMargins()
+        size += QtCore.QSize(left + right, top + bottom)
+        return size
+
+    def _do_layout(self, rect, test_only):
+        x = rect.x()
+        y = rect.y()
+        line_height = 0
+        left, top, right, bottom = self.getContentsMargins()
+        effective_rect = rect.adjusted(left, top, -right, -bottom)
+        x = effective_rect.x(); y = effective_rect.y()
+        for item in self._items:
+            w = item.sizeHint().width()
+            h = item.sizeHint().height()
+            if x + w > effective_rect.right() and line_height > 0:
+                x = effective_rect.x()
+                y = y + line_height + self._spacing
+                line_height = 0
+            if not test_only:
+                item.setGeometry(QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+            x += w + self._spacing
+            line_height = max(line_height, h)
+        return y + line_height - rect.y()
+
+
+def add_card_shadow(widget: QtWidgets.QWidget):
+    try:
+        eff = QGraphicsDropShadowEffect(widget)
+        eff.setBlurRadius(24)
+        eff.setOffset(0, 6)
+        eff.setColor(QtGui.QColor(0, 0, 0, 100))
+        widget.setGraphicsEffect(eff)
+    except Exception:
+        pass
 
 
 class LogEntryTab(QtWidgets.QWidget):
@@ -99,7 +181,7 @@ class LogEntryTab(QtWidgets.QWidget):
         outer.setSpacing(12)
         heading = QtWidgets.QLabel("Log Today", self); heading.setProperty("heading", True)
         outer.addWidget(heading)
-        card = QtWidgets.QFrame(self); card.setObjectName("Card")
+        card = QtWidgets.QFrame(self); card.setObjectName("Card"); add_card_shadow(card)
         layout = QtWidgets.QFormLayout(card)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
@@ -274,14 +356,14 @@ class HistoryTab(QtWidgets.QWidget):
         # Split calendar and side panel
         split = QtWidgets.QSplitter(self)
         # Calendar card
-        cal_card = QtWidgets.QFrame(self); cal_card.setObjectName("Card")
+        cal_card = QtWidgets.QFrame(self); cal_card.setObjectName("Card"); add_card_shadow(cal_card)
         cal_v = QtWidgets.QVBoxLayout(cal_card); cal_v.setContentsMargins(8,8,8,8)
         self.calendar = EntryCalendarWidget(cal_card)
         self.calendar.selectionChanged.connect(self._on_day_selected)
         cal_v.addWidget(self.calendar)
         split.addWidget(cal_card)
 
-        right = QtWidgets.QFrame(self); right.setObjectName("Card")
+        right = QtWidgets.QFrame(self); right.setObjectName("Card"); add_card_shadow(right)
         rlayout = QtWidgets.QVBoxLayout(right); rlayout.setSpacing(8); rlayout.setContentsMargins(12,12,12,12)
         self.details_btn = QtWidgets.QPushButton("View Details", right)
         self.edit_btn = QtWidgets.QPushButton("Edit", right)
@@ -505,7 +587,15 @@ class EntryDetailsDialog(QtWidgets.QDialog):
         add_row(0, "Minutes", minutes)
         add_row(1, "Confidence", confidence)
         add_row(2, "Progress", progress)
-        add_row(3, "Tags", self._data.get("tags", ""))
+        # Tags as chips
+        tags_raw = str(self._data.get("tags", "") or "")
+        chips = QtWidgets.QWidget(self)
+        flow = FlowLayout(chips, spacing=6)
+        chips.setLayout(flow)
+        for t in [x.strip() for x in tags_raw.split(",") if x.strip()]:
+            chip = QtWidgets.QLabel(t, chips); chip.setObjectName("Chip")
+            flow.addWidget(chip)
+        add_row(3, "Tags", chips)
 
         # Long text fields with read-only boxes
         practiced = QtWidgets.QTextEdit(self); practiced.setReadOnly(True); practiced.setPlainText(str(self._data.get("practiced", "") or ""))
@@ -548,7 +638,7 @@ class DataTab(QtWidgets.QWidget):
         v.setSpacing(12)
         heading = QtWidgets.QLabel("Data", self); heading.setProperty("heading", True)
         v.addWidget(heading)
-        card = QtWidgets.QFrame(self); card.setObjectName("Card")
+        card = QtWidgets.QFrame(self); card.setObjectName("Card"); add_card_shadow(card)
         card_layout = QtWidgets.QVBoxLayout(card)
         self.table = QtWidgets.QTableView(card)
         header = self.table.horizontalHeader()
