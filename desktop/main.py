@@ -194,7 +194,11 @@ class EntryCalendarWidget(QtWidgets.QCalendarWidget):
 
     def set_entries(self, entries: dict[dt.date, dict]):
         self._entries = entries or {}
-        self.viewport().update()
+        # QCalendarWidget does not expose viewport(); request a repaint of cells
+        try:
+            self.updateCells()
+        except Exception:
+            self.update()
 
     def paintCell(self, painter: QtGui.QPainter, rect: QtCore.QRect, date: QtCore.QDate):
         super().paintCell(painter, rect, date)
