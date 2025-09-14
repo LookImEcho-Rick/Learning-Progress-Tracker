@@ -6,6 +6,7 @@ if ROOT not in sys.path:
 import datetime as dt
 
 from PySide6 import QtWidgets, QtCore, QtGui
+from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
 
 import pandas as pd
 
@@ -191,9 +192,7 @@ class HistoryTab(QtWidgets.QWidget):
         filters.addWidget(self.tag_filter)
         filters.addWidget(self.apply_btn)
 
-        self.table = QtWidgets.QTableWidget(self)
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Date", "Topic", "Minutes", "Confidence", "Progress", "Tags"])
+        self.table = QtWidgets.QTableView(self)
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
@@ -220,7 +219,7 @@ class HistoryTab(QtWidgets.QWidget):
             today = QtCore.QDate.currentDate()
             self.start_date.setDate(today)
             self.end_date.setDate(today)
-            self.table.setRowCount(0)
+            self.table.setModel(None)
             return
         # Setup date filters
         dates = pd.to_datetime(df["date"]).dt.date
@@ -246,20 +245,16 @@ class HistoryTab(QtWidgets.QWidget):
         fdf["progress"] = fdf["minutes"].astype(int) * fdf["confidence"].astype(int)
 
         rows = fdf.sort_values("date", ascending=False).reset_index(drop=True)
-        self.table.setRowCount(len(rows))
-        for i, row in rows.iterrows():
-            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(str(row["date"])) )
-            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(row["topic"])) )
-            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(str(int(row["minutes"])) ))
-            self.table.setItem(i, 3, QtWidgets.QTableWidgetItem(str(int(row["confidence"])) ))
-            self.table.setItem(i, 4, QtWidgets.QTableWidgetItem(str(int(row["progress"])) ))
-            self.table.setItem(i, 5, QtWidgets.QTableWidgetItem(str(row.get("tags", ""))) )
+        self._hist_df = rows[["date", "topic", "minutes", "confidence", "progress", "tags"]].copy()
+        self.table.setModel(DataFrameModel(self._hist_df))
 
     def _selected_date(self) -> dt.date | None:
-        r = self.table.currentRow()
-        if r < 0:
+        sel = self.table.selectionModel().selectedRows()
+        if not sel:
             return None
-        date_str = self.table.item(r, 0).text()
+        r = sel[0].row()
+        idx = self.table.model().index(r, 0)
+        date_str = self.table.model().data(idx, Qt.DisplayRole)
         try:
             return pd.to_datetime(date_str).date()
         except Exception:
@@ -367,9 +362,7 @@ class DataTab(QtWidgets.QWidget):
         v = QtWidgets.QVBoxLayout(self)
         v.setContentsMargins(16, 16, 16, 16)
         v.setSpacing(12)
-        self.table = QtWidgets.QTableWidget(self)
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(["Date", "Topic", "Minutes", "Confidence", "Progress", "Tags"])
+        self.table = QtWidgets.QTableView(self)
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
@@ -392,17 +385,12 @@ class DataTab(QtWidgets.QWidget):
     def refresh(self):
         df = get_all_entries_df()
         if df.empty:
-            self.table.setRowCount(0)
+            self.table.setModel(None)
             return
+        df = df.sort_values("date", ascending=False).reset_index(drop=True)
         df["progress"] = df["minutes"].astype(int) * df["confidence"].astype(int)
-        self.table.setRowCount(len(df))
-        for i, row in df.sort_values("date", ascending=False).iterrows():
-            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(str(row["date"])) )
-            self.table.setItem(i, 1, QtWidgets.QTableWidgetItem(str(row["topic"])) )
-            self.table.setItem(i, 2, QtWidgets.QTableWidgetItem(str(int(row["minutes"])) ))
-            self.table.setItem(i, 3, QtWidgets.QTableWidgetItem(str(int(row["confidence"])) ))
-            self.table.setItem(i, 4, QtWidgets.QTableWidgetItem(str(int(row["progress"])) ))
-            self.table.setItem(i, 5, QtWidgets.QTableWidgetItem(str(row.get("tags", ""))) )
+        self._data_df = df[["date", "topic", "minutes", "confidence", "progress", "tags"]].copy()
+        self.table.setModel(DataFrameModel(self._data_df))
 
     def export_csv(self):
         try:
@@ -438,18 +426,80 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Learning Progress Tracker")
-        tabs = QtWidgets.QTabWidget(self)
-        self.setCentralWidget(tabs)
-        self.log_tab = LogEntryTab()
-        self.hist_tab = HistoryTab()
-        self.data_tab = DataTab()
-        self.insights_tab = InsightsTab()
-        self.settings_tab = SettingsTab()
-        tabs.addTab(self.log_tab, "Log Entry")
-        tabs.addTab(self.hist_tab, "History")
-        tabs.addTab(self.insights_tab, "Insights")
-        tabs.addTab(self.data_tab, "Data")
-        tabs.addTab(self.settings_tab, "Settings")
+        # Sidebar navigation + stacked pages
+        self.nav = QtWidgets.QListWidget(self)
+        self.nav.setIconSize(QtCore.QSize(20, 20))
+        self.nav.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        for name in ["Log Entry", "History", "Insights", "Data", "Settings"]:
+            self.nav.addItem(name)
+        self.pages = QtWidgets.QStackedWidget(self)
+        self.log_tab = LogEntryTab(); self.pages.addWidget(self.log_tab)
+        self.hist_tab = HistoryTab(); self.pages.addWidget(self.hist_tab)
+        self.insights_tab = InsightsTab(); self.pages.addWidget(self.insights_tab)
+        self.data_tab = DataTab(); self.pages.addWidget(self.data_tab)
+        self.settings_tab = SettingsTab(); self.pages.addWidget(self.settings_tab)
+        self.nav.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.nav.setCurrentRow(0)
+        splitter = QtWidgets.QSplitter(self)
+        splitter.addWidget(self.nav)
+        splitter.addWidget(self.pages)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        self.setCentralWidget(splitter)
+        # Toolbar
+        tb = QtWidgets.QToolBar("Main", self)
+        tb.setMovable(False)
+        self.addToolBar(Qt.TopToolBarArea, tb)
+        act_new = QtGui.QAction("New Entry", self); act_new.setShortcut("Ctrl+N"); act_new.triggered.connect(self._focus_new_entry)
+        act_export = QtGui.QAction("Export CSV", self); act_export.setShortcut("Ctrl+E"); act_export.triggered.connect(self.data_tab.export_csv)
+        act_import = QtGui.QAction("Import CSV", self); act_import.setShortcut("Ctrl+I"); act_import.triggered.connect(self.data_tab.import_csv)
+        act_refresh = QtGui.QAction("Refresh", self); act_refresh.setShortcut("F5"); act_refresh.triggered.connect(self._refresh_current)
+        tb.addAction(act_new); tb.addAction(act_export); tb.addAction(act_import); tb.addAction(act_refresh)
+        # Status bar
+        self.status = self.statusBar()
+        self.status.showMessage("Ready")
+        # Persist window geometry
+        self._load_window_state()
+
+    def _focus_new_entry(self):
+        self.nav.setCurrentRow(0)
+        try:
+            self.log_tab.topic_edit.setFocus(Qt.OtherFocusReason)
+        except Exception:
+            pass
+
+    def _refresh_current(self):
+        idx = self.pages.currentIndex()
+        try:
+            if idx == 1:
+                self.hist_tab.refresh()
+            elif idx == 2:
+                self.insights_tab.refresh()
+            elif idx == 3:
+                self.data_tab.refresh()
+        except Exception:
+            pass
+
+    def _load_window_state(self):
+        try:
+            s = QtCore.QSettings("LPT", "LearningProgressTracker")
+            geo = s.value("win/geometry")
+            if geo:
+                self.restoreGeometry(geo)
+            state = s.value("win/state")
+            if state:
+                self.restoreState(state)
+        except Exception:
+            pass
+
+    def closeEvent(self, event):
+        try:
+            s = QtCore.QSettings("LPT", "LearningProgressTracker")
+            s.setValue("win/geometry", self.saveGeometry())
+            s.setValue("win/state", self.saveState())
+        except Exception:
+            pass
+        super().closeEvent(event)
 
 
 class InsightsTab(QtWidgets.QWidget):
@@ -535,6 +585,10 @@ class InsightsTab(QtWidgets.QWidget):
         # Draw
         self.canvas1.draw(); self.canvas2.draw(); self.canvas3.draw()
 
+    # Helper to allow MainWindow to call refresh
+    def do_refresh(self):
+        self.refresh()
+
 
 class SettingsTab(QtWidgets.QWidget):
     def __init__(self):
@@ -560,6 +614,42 @@ class SettingsTab(QtWidgets.QWidget):
     def save(self):
         set_setting("weekly_goal_minutes", str(int(self.goal_spin.value())))
         QtWidgets.QMessageBox.information(self, "Settings", "Saved weekly goal.")
+
+
+class DataFrameModel(QAbstractTableModel):
+    def __init__(self, df: pd.DataFrame):
+        super().__init__()
+        self._df = df.reset_index(drop=True)
+
+    def rowCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else len(self._df)
+
+    def columnCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else len(self._df.columns)
+
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        if role in (Qt.DisplayRole, Qt.EditRole):
+            val = self._df.iat[index.row(), index.column()]
+            return "" if pd.isna(val) else str(val)
+        return None
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role != Qt.DisplayRole:
+            return None
+        if orientation == Qt.Horizontal:
+            return str(self._df.columns[section]).title()
+        return str(section + 1)
+
+    def sort(self, column, order):
+        col = self._df.columns[column]
+        try:
+            self.layoutAboutToBeChanged.emit()
+            self._df = self._df.sort_values(col, ascending=(order == Qt.AscendingOrder)).reset_index(drop=True)
+            self.layoutChanged.emit()
+        except Exception:
+            pass
 
 
 def apply_theme(app: QtWidgets.QApplication):
@@ -614,3 +704,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
