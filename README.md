@@ -1,6 +1,6 @@
 # Learning Progress Tracker
 
-A simple Streamlit app to log daily learning sessions, review history, and visualize progress over time. Data is stored locally in SQLite, with CSV/XLSX export options.
+A simple desktop app (PySide6) to log daily learning sessions, review history, and visualize progress over time. Data is stored locally in SQLite, with CSV import/export and automatic CSV sync.
 
 ## Features
 - Log daily entries with topic, minutes, notes, challenges, wins, and confidence.
@@ -14,8 +14,7 @@ A simple Streamlit app to log daily learning sessions, review history, and visua
 - Tags for entries and tag-based filtering in History.
 - Streaks (current and longest) and weekly goal tracking.
 - Edit and delete past entries from the History page.
-- Import CSV/XLSX (merge by date) from the Data page.
- - Import CSV (background validation; errors only if something's wrong).
+- Import CSV (merge by date) with background validation; errors only if something's wrong.
 
 ## Requirements
 - Python 3.10+
@@ -55,7 +54,6 @@ It also writes a best-effort daily backup to `data/backups/tracker-YYYYMMDD.db`.
 
 ## Project Structure
 
-- `app.py` – main Streamlit app (UI, pages)
 - `services/storage.py` – SQLite persistence and exports
 - `services/metrics.py` – progress score, week index, streaks & weekly helpers
 - `docs/` – user guide and architecture notes
@@ -67,5 +65,5 @@ It also writes a best-effort daily backup to `data/backups/tracker-YYYYMMDD.db`.
 ## Notes
 - This repository ignores the local virtual environment (`.venv/`) and generated data files.
 - Validation: Topic ≤ 200 chars, Minutes 0–1440, Confidence 1–5, Tags up to 10 with 32 chars each. Long fields are truncated with a warning.
- - CSV sync: On launch, the app creates/updates a CSV in your Documents folder (`Documents/Learning Progress Tracker/entries.csv`) and imports from it if present. On exit, it saves the latest data back to the CSV automatically.
+- CSV sync: On launch, the app creates/updates a CSV in your Documents folder (`Documents/Learning Progress Tracker/entries.csv`) and imports from it if present. On exit, it saves the latest data back to the CSV automatically.
 

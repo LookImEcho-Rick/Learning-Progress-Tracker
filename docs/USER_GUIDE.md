@@ -5,8 +5,9 @@
 ## Running the App
 - Create and activate a virtual environment (see README for details).
 - Install dependencies: `pip install -r requirements.txt`.
-- Start the app: `streamlit run app.py`.
-- Do not run with `python app.py`; the UI won't start that way.
+- Start the desktop app:
+  - Windows: `pwsh -File scripts/run_desktop.ps1`
+  - macOS/Linux: `bash scripts/run_desktop.sh`
 
 ## Adding a New Entry
 - Launch the app — today's date will already be in a blank row.
@@ -45,7 +46,7 @@
 ## Data Management
 - Export your data as CSV.
 - Automatic daily backups are stored locally.
- - Automatic CSV sync: the app reads from and writes to a CSV in your Documents folder (`Documents/Learning Progress Tracker/entries.csv`).
+- Automatic CSV sync: the app reads from and writes to a CSV in your Documents folder (`Documents/Learning Progress Tracker/entries.csv`).
 
 ### Importing Data
 - Go to the **Data** page.

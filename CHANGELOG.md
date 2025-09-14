@@ -1,12 +1,15 @@
 # Changelog
 
 ## [Unreleased]
+- Nothing yet.
+
+## [0.0.1] - 2025-09-14
 - Project initialized with documentation scaffolding.
 - Core data model defined in `ARCHITECTURE.md`.
 - Roadmap established.
- - Implemented core app with local SQLite persistence.
- - Added history view, insights (charts), and weekly summary.
-- Implemented CSV and Excel export.
+- Implemented core app with local SQLite persistence.
+- Added history view, insights (charts), and weekly summary.
+- Implemented CSV export.
 - Added week index calculation and weekly summary based on first entry.
 - Added best-effort daily backups to `data/backups/`.
 - Introduced pytest suite with storage and week-index tests.

@@ -1,16 +1,15 @@
 # Roadmap
 
 ## Now
-- [ ] Documentation and auto-update flow.
-- [ ] Add more tests (charts, inputs validation).
-- [ ] Basic UI polish and help text.
+- [ ] Documentation sync and auto-update flow.
+- [ ] Expand test coverage (charts, validation edge cases).
+- [ ] Basic UI polish and inline help.
 
 ## Next
-- [ ] CSV import (merge by date).
-- [ ] Input validation and error states.
- - [ ] Input validation and error states.
+- [ ] Packaging/distribution improvements.
+- [ ] Theming (dark/light/system).
+- [ ] Settings improvements (more configurable options).
 
 ## Later
-- [ ] Theming (dark/light/system).
 - [ ] Collaborative mode (multiple learners).
 - [ ] Cloud sync (opt-in).
