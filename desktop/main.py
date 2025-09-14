@@ -7,6 +7,7 @@ import datetime as dt
 
 from PySide6 import QtWidgets, QtCore, QtGui
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QPropertyAnimation
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtWidgets import QGraphicsOpacityEffect
 
 import pandas as pd
@@ -126,7 +127,16 @@ class LogEntryTab(QtWidgets.QWidget):
         layout.addRow("Challenges", self.challenges_edit)
         layout.addRow("Wins", self.wins_edit)
         layout.addRow("Tags (comma-separated)", self.tags_edit)
-        layout.addRow(self.save_btn)
+        # Actions row with Save and New
+        hb = QtWidgets.QHBoxLayout()
+        hb.addWidget(self.save_btn)
+        self.new_btn = QtWidgets.QPushButton("New", self)
+        self.new_btn.setToolTip("Clear form for a new entry")
+        self.new_btn.clicked.connect(self.new_entry)
+        hb.addWidget(self.new_btn)
+        actions_row = QtWidgets.QWidget(self)
+        actions_row.setLayout(hb)
+        layout.addRow(actions_row)
 
     def save_entry(self):
         date_q = self.date_edit.date()
@@ -167,6 +177,16 @@ class LogEntryTab(QtWidgets.QWidget):
             tags=sanitized["tags"],
         )
         QtWidgets.QMessageBox.information(self, "Saved", "Entry saved.")
+
+    def new_entry(self):
+        self.date_edit.setDate(QtCore.QDate.currentDate())
+        self.topic_edit.clear()
+        self.minutes_spin.setValue(0)
+        self.conf_slider.setValue(3)
+        self.practiced_edit.clear()
+        self.challenges_edit.clear()
+        self.wins_edit.clear()
+        self.tags_edit.clear()
 
 
 class HistoryTab(QtWidgets.QWidget):
@@ -458,7 +478,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hist_tab = HistoryTab(); self.pages.addWidget(self.hist_tab)
         self.insights_tab = InsightsTab(); self.pages.addWidget(self.insights_tab)
         self.data_tab = DataTab(); self.pages.addWidget(self.data_tab)
-        self.settings_tab = SettingsTab(); self.pages.addWidget(self.settings_tab)
+        self.settings_tab = SettingsTab(self); self.pages.addWidget(self.settings_tab)
         self.nav.currentRowChanged.connect(self._navigate_to)
         self.nav.setCurrentRow(0)
         splitter = QtWidgets.QSplitter(self)
@@ -468,24 +488,17 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([240, 1200])
         self.setCentralWidget(splitter)
-        # Toolbar
-        tb = QtWidgets.QToolBar("Main", self)
-        tb.setMovable(False)
-        self.addToolBar(Qt.TopToolBarArea, tb)
-        act_new = QtGui.QAction("New Entry", self); act_new.setShortcut("Ctrl+N"); act_new.triggered.connect(self._focus_new_entry)
-        act_export = QtGui.QAction("Export CSV", self); act_export.setShortcut("Ctrl+E"); act_export.triggered.connect(self.data_tab.export_csv)
-        act_import = QtGui.QAction("Import CSV", self); act_import.setShortcut("Ctrl+I"); act_import.triggered.connect(self.data_tab.import_csv)
-        act_refresh = QtGui.QAction("Refresh", self); act_refresh.setShortcut("F5"); act_refresh.triggered.connect(self._refresh_current)
-        act_compact = QtGui.QAction("Compact Sidebar", self); act_compact.setCheckable(True); act_compact.toggled.connect(self._toggle_sidebar_compact)
-        # Load saved preference
+        # Keyboard shortcuts (no visible toolbar)
+        QShortcut(QKeySequence("Ctrl+N"), self, activated=self._focus_new_entry)
+        QShortcut(QKeySequence("Ctrl+E"), self, activated=self.data_tab.export_csv)
+        QShortcut(QKeySequence("Ctrl+I"), self, activated=self.data_tab.import_csv)
+        QShortcut(QKeySequence("F5"), self, activated=self._refresh_current)
+        # Load and apply compact sidebar preference
         try:
             s = QtCore.QSettings("LPT", "LearningProgressTracker")
             compact_pref = bool(int(s.value("ui/compactSidebar", "0")))
         except Exception:
             compact_pref = False
-        act_compact.setChecked(compact_pref)
-        tb.addAction(act_new); tb.addAction(act_export); tb.addAction(act_import); tb.addAction(act_refresh); tb.addAction(act_compact)
-        # Apply initial compact state
         self._toggle_sidebar_compact(compact_pref)
         # Status bar
         self.status = self.statusBar()
@@ -670,8 +683,9 @@ class InsightsTab(QtWidgets.QWidget):
 
 
 class SettingsTab(QtWidgets.QWidget):
-    def __init__(self):
+    def __init__(self, main_window: QtWidgets.QMainWindow):
         super().__init__()
+        self._main = main_window
         self._build_ui()
 
     def _build_ui(self):
@@ -685,9 +699,19 @@ class SettingsTab(QtWidgets.QWidget):
         except Exception:
             val = 0
         self.goal_spin.setValue(val)
+        # Compact sidebar toggle
+        self.compact_chk = QtWidgets.QCheckBox("Compact sidebar", self)
+        try:
+            s = QtCore.QSettings("LPT", "LearningProgressTracker")
+            compact_pref = bool(int(s.value("ui/compactSidebar", "0")))
+        except Exception:
+            compact_pref = False
+        self.compact_chk.setChecked(compact_pref)
+        self.compact_chk.toggled.connect(self._main._toggle_sidebar_compact)
         save_btn = QtWidgets.QPushButton("Save", self)
         save_btn.clicked.connect(self.save)
         layout.addRow("Weekly goal (minutes)", self.goal_spin)
+        layout.addRow(self.compact_chk)
         layout.addRow(save_btn)
 
     def save(self):
