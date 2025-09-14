@@ -225,14 +225,20 @@ class HistoryTab(QtWidgets.QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
 
+        self.view_btn = QtWidgets.QPushButton("View Details", self)
         self.edit_btn = QtWidgets.QPushButton("Edit Selected", self)
         self.delete_btn = QtWidgets.QPushButton("Delete Selected", self)
+        self.view_btn.clicked.connect(self.open_details)
         self.edit_btn.clicked.connect(self.edit_selected)
         self.delete_btn.clicked.connect(self.delete_selected)
+        # Open detail dialog on row click
+        self.table.clicked.connect(lambda _ix: self.open_details())
+        self.table.doubleClicked.connect(lambda _ix: self.open_details())
 
         vbox.addLayout(filters)
         vbox.addWidget(self.table)
         hb = QtWidgets.QHBoxLayout()
+        hb.addWidget(self.view_btn)
         hb.addWidget(self.edit_btn)
         hb.addWidget(self.delete_btn)
         vbox.addLayout(hb)
@@ -288,6 +294,36 @@ class HistoryTab(QtWidgets.QWidget):
             return pd.to_datetime(date_str).date()
         except Exception:
             return None
+
+    def _selected_row_dict(self) -> dict | None:
+        model = self.table.model()
+        if model is None:
+            return None
+        sel = self.table.selectionModel().selectedRows()
+        if not sel:
+            return None
+        r = sel[0].row()
+        df = getattr(self, "_hist_df", None)
+        try:
+            if df is not None:
+                row = df.iloc[r]
+                return {k: ("" if pd.isna(v) else v) for k, v in row.to_dict().items()}
+        except Exception:
+            pass
+        # Fallback: build dict from model headers
+        out = {}
+        for c in range(model.columnCount()):
+            header = model.headerData(c, Qt.Horizontal, Qt.DisplayRole)
+            val = model.data(model.index(r, c), Qt.DisplayRole)
+            out[str(header).lower()] = val
+        return out
+
+    def open_details(self):
+        data = self._selected_row_dict()
+        if not data:
+            return
+        dlg = EntryDetailsDialog(data, self)
+        dlg.exec()
 
     def edit_selected(self):
         d = self._selected_date()
@@ -379,6 +415,80 @@ class EditDialog(QtWidgets.QDialog):
             tags=sanitized["tags"],
         )
         self.accept()
+
+
+class EntryDetailsDialog(QtWidgets.QDialog):
+    def __init__(self, data: dict, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Entry Details")
+        self.setMinimumSize(600, 500)
+        self._data = data
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+
+        # Header
+        title = QtWidgets.QLabel(self)
+        date = str(self._data.get("date", ""))
+        topic = str(self._data.get("topic", "")).strip()
+        title.setText(f"<b>{date}</b> — {QtGui.QGuiApplication.translate('EntryDetails', topic or '(No topic)')}")
+        layout.addWidget(title)
+
+        grid = QtWidgets.QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(8)
+
+        def add_row(row, label, value):
+            lab = QtWidgets.QLabel(f"{label}", self)
+            lab.setAlignment(Qt.AlignRight | Qt.AlignTop)
+            grid.addWidget(lab, row, 0)
+            if isinstance(value, QtWidgets.QWidget):
+                grid.addWidget(value, row, 1)
+            else:
+                val = QtWidgets.QLabel(str(value), self)
+                val.setWordWrap(True)
+                grid.addWidget(val, row, 1)
+
+        # Key stats
+        minutes = self._data.get("minutes", "")
+        confidence = self._data.get("confidence", "")
+        try:
+            progress = int(minutes) * int(confidence)
+        except Exception:
+            progress = ""
+        add_row(0, "Minutes", minutes)
+        add_row(1, "Confidence", confidence)
+        add_row(2, "Progress", progress)
+        add_row(3, "Tags", self._data.get("tags", ""))
+
+        # Long text fields with read-only boxes
+        practiced = QtWidgets.QTextEdit(self); practiced.setReadOnly(True); practiced.setPlainText(str(self._data.get("practiced", "") or ""))
+        challenges = QtWidgets.QTextEdit(self); challenges.setReadOnly(True); challenges.setPlainText(str(self._data.get("challenges", "") or ""))
+        wins = QtWidgets.QTextEdit(self); wins.setReadOnly(True); wins.setPlainText(str(self._data.get("wins", "") or ""))
+        practiced.setMinimumHeight(80); challenges.setMinimumHeight(80); wins.setMinimumHeight(80)
+        add_row(4, "Practiced", practiced)
+        add_row(5, "Challenges", challenges)
+        add_row(6, "Wins", wins)
+
+        layout.addLayout(grid)
+
+        # Buttons
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Close, self)
+        copy_btn = QtWidgets.QPushButton("Copy JSON", self)
+        btns.addButton(copy_btn, QtWidgets.QDialogButtonBox.ActionRole)
+        btns.rejected.connect(self.reject)
+        copy_btn.clicked.connect(self.copy_json)
+        layout.addWidget(btns)
+
+    def copy_json(self):
+        import json
+        try:
+            text = json.dumps(self._data, ensure_ascii=False, indent=2, default=str)
+            QtWidgets.QApplication.clipboard().setText(text)
+            QtWidgets.QMessageBox.information(self, "Copied", "Entry copied as JSON to clipboard.")
+        except Exception as ex:
+            QtWidgets.QMessageBox.warning(self, "Copy Failed", str(ex))
 
 
 class DataTab(QtWidgets.QWidget):
