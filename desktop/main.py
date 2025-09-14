@@ -185,6 +185,33 @@ class LogEntryTab(QtWidgets.QWidget):
         self.tags_edit.clear()
 
 
+class EntryCalendarWidget(QtWidgets.QCalendarWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._entries: dict[dt.date, dict] = {}
+        self.setGridVisible(True)
+        self.setVerticalHeaderFormat(QtWidgets.QCalendarWidget.NoVerticalHeader)
+
+    def set_entries(self, entries: dict[dt.date, dict]):
+        self._entries = entries or {}
+        self.viewport().update()
+
+    def paintCell(self, painter: QtGui.QPainter, rect: QtCore.QRect, date: QtCore.QDate):
+        super().paintCell(painter, rect, date)
+        d = dt.date(date.year(), date.month(), date.day())
+        if d in self._entries:
+            # Draw a rounded badge and topic snippet
+            painter.save()
+            painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
+            bg = QtGui.QColor(47, 111, 235, 28)
+            painter.fillRect(rect.adjusted(2, 18, -2, -2), bg)
+            painter.setPen(QtGui.QPen(QtGui.QColor(47, 111, 235)))
+            topic = str(self._entries[d].get("topic", "")).strip()
+            snippet = topic[:18] + ("…" if len(topic) > 18 else "")
+            painter.drawText(rect.adjusted(6, 24, -6, -4), Qt.TextWordWrap, snippet)
+            painter.restore()
+
+
 class HistoryTab(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
@@ -192,131 +219,108 @@ class HistoryTab(QtWidgets.QWidget):
         self.refresh()
 
     def _build_ui(self):
-        vbox = QtWidgets.QVBoxLayout(self)
-        vbox.setContentsMargins(16, 16, 16, 16)
-        vbox.setSpacing(12)
-        filters = QtWidgets.QHBoxLayout()
-        filters.setSpacing(8)
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(12)
 
-        self.start_date = QtWidgets.QDateEdit(self)
-        self.start_date.setCalendarPopup(True)
-        self.end_date = QtWidgets.QDateEdit(self)
-        self.end_date.setCalendarPopup(True)
-        self.tag_filter = QtWidgets.QLineEdit(self)
-        self.tag_filter.setPlaceholderText("tags: comma-separated")
+        # Controls
+        ctrl = QtWidgets.QHBoxLayout()
+        ctrl.setSpacing(8)
+        self.sort_combo = QtWidgets.QComboBox(self)
+        self.sort_combo.addItems(["Date", "Minutes (desc)", "Confidence (desc)", "Progress (desc)"])
+        self.sort_combo.currentIndexChanged.connect(self._rebuild_sorted)
+        ctrl.addWidget(QtWidgets.QLabel("Sort"))
+        ctrl.addWidget(self.sort_combo)
+        ctrl.addStretch(1)
+        root.addLayout(ctrl)
 
-        self.apply_btn = QtWidgets.QPushButton("Apply Filters", self)
-        self.apply_btn.clicked.connect(self.refresh)
+        # Split calendar and side panel
+        split = QtWidgets.QSplitter(self)
+        self.calendar = EntryCalendarWidget(self)
+        self.calendar.selectionChanged.connect(self._on_day_selected)
+        split.addWidget(self.calendar)
 
-        filters.addWidget(QtWidgets.QLabel("Start"))
-        filters.addWidget(self.start_date)
-        filters.addWidget(QtWidgets.QLabel("End"))
-        filters.addWidget(self.end_date)
-        filters.addWidget(QtWidgets.QLabel("Tags"))
-        filters.addWidget(self.tag_filter)
-        filters.addWidget(self.apply_btn)
-
-        self.table = QtWidgets.QTableView(self)
-        header = self.table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.table.setSortingEnabled(True)
-        self.table.setAlternatingRowColors(True)
-        self.table.verticalHeader().setVisible(False)
-
-        self.view_btn = QtWidgets.QPushButton("View Details", self)
-        self.edit_btn = QtWidgets.QPushButton("Edit Selected", self)
-        self.delete_btn = QtWidgets.QPushButton("Delete Selected", self)
-        self.view_btn.clicked.connect(self.open_details)
+        right = QtWidgets.QWidget(self)
+        rlayout = QtWidgets.QVBoxLayout(right); rlayout.setSpacing(8)
+        self.details_btn = QtWidgets.QPushButton("View Details", right)
+        self.edit_btn = QtWidgets.QPushButton("Edit", right)
+        self.delete_btn = QtWidgets.QPushButton("Delete", right)
+        self.details_btn.clicked.connect(self.open_details)
         self.edit_btn.clicked.connect(self.edit_selected)
         self.delete_btn.clicked.connect(self.delete_selected)
-        # Open detail dialog on row click
-        self.table.clicked.connect(lambda _ix: self.open_details())
-        self.table.doubleClicked.connect(lambda _ix: self.open_details())
-
-        vbox.addLayout(filters)
-        vbox.addWidget(self.table)
-        hb = QtWidgets.QHBoxLayout()
-        hb.addWidget(self.view_btn)
-        hb.addWidget(self.edit_btn)
-        hb.addWidget(self.delete_btn)
-        vbox.addLayout(hb)
+        btnrow = QtWidgets.QHBoxLayout(); btnrow.addWidget(self.details_btn); btnrow.addWidget(self.edit_btn); btnrow.addWidget(self.delete_btn)
+        rlayout.addLayout(btnrow)
+        rlayout.addWidget(QtWidgets.QLabel("Sorted Dates", right))
+        self.sorted_list = QtWidgets.QListWidget(right)
+        self.sorted_list.itemClicked.connect(self._on_sorted_item)
+        rlayout.addWidget(self.sorted_list, 1)
+        split.addWidget(right)
+        split.setStretchFactor(0, 2)
+        split.setStretchFactor(1, 1)
+        root.addWidget(split, 1)
 
     def refresh(self):
         df = get_all_entries_df()
-        if df.empty:
-            today = QtCore.QDate.currentDate()
-            self.start_date.setDate(today)
-            self.end_date.setDate(today)
-            self.table.setModel(None)
-            return
-        # Setup date filters
-        dates = pd.to_datetime(df["date"]).dt.date
-        min_d = QtCore.QDate(dates.min().year, dates.min().month, dates.min().day)
-        max_d = QtCore.QDate(dates.max().year, dates.max().month, dates.max().day)
-        self.start_date.setDate(min_d)
-        self.end_date.setDate(max_d)
+        self._hist_df = pd.DataFrame(columns=["date","topic","minutes","confidence","progress","tags","practiced","challenges","wins"]) if df.empty else df.copy()
+        if not self._hist_df.empty:
+            self._hist_df["date"] = pd.to_datetime(self._hist_df["date"]).dt.date
+            for c in ["practiced","challenges","wins","tags","topic"]:
+                if c not in self._hist_df.columns:
+                    self._hist_df[c] = ""
+            self._hist_df["minutes"] = self._hist_df["minutes"].astype(int)
+            self._hist_df["confidence"] = self._hist_df["confidence"].astype(int)
+            self._hist_df["progress"] = self._hist_df["minutes"].astype(int) * self._hist_df["confidence"].astype(int)
 
-        start = dt.date(self.start_date.date().year(), self.start_date.date().month(), self.start_date.date().day())
-        end = dt.date(self.end_date.date().year(), self.end_date.date().month(), self.end_date.date().day())
-        mask = (pd.to_datetime(df["date"]).dt.date >= start) & (pd.to_datetime(df["date"]).dt.date <= end)
-        fdf = df.loc[mask].copy()
-
-        # Tag filter
-        tags = [t.strip().lower() for t in self.tag_filter.text().split(",") if t.strip()]
-        if tags:
-            def has_tag(ts: str) -> bool:
-                items = {t.strip().lower() for t in str(ts).split(",") if t.strip()}
-                return any(t in items for t in tags)
-            fdf = fdf[fdf["tags"].apply(has_tag)]
-
-        # Derived
-        fdf["progress"] = fdf["minutes"].astype(int) * fdf["confidence"].astype(int)
-
-        rows = fdf.sort_values("date", ascending=False).reset_index(drop=True)
-        # Include all entry fields in history view
-        cols = ["date", "topic", "minutes", "confidence", "progress", "tags", "practiced", "challenges", "wins"]
-        for c in ["practiced", "challenges", "wins"]:
-            if c not in rows.columns:
-                rows[c] = ""
-        self._hist_df = rows[cols].copy()
-        self.table.setModel(DataFrameModel(self._hist_df))
+        # Feed calendar entries
+        entries = {row["date"]: row for _, row in self._hist_df.iterrows()} if not self._hist_df.empty else {}
+        self.calendar.set_entries(entries)
+        self._rebuild_sorted()
 
     def _selected_date(self) -> dt.date | None:
-        sel = self.table.selectionModel().selectedRows()
-        if not sel:
+        qd = self.calendar.selectedDate()
+        if not qd.isValid():
             return None
-        r = sel[0].row()
-        idx = self.table.model().index(r, 0)
-        date_str = self.table.model().data(idx, Qt.DisplayRole)
-        try:
-            return pd.to_datetime(date_str).date()
-        except Exception:
-            return None
+        return dt.date(qd.year(), qd.month(), qd.day())
 
     def _selected_row_dict(self) -> dict | None:
-        model = self.table.model()
-        if model is None:
+        if self._hist_df is None or self._hist_df.empty:
             return None
-        sel = self.table.selectionModel().selectedRows()
-        if not sel:
+        d = self._selected_date()
+        if not d:
             return None
-        r = sel[0].row()
-        df = getattr(self, "_hist_df", None)
-        try:
-            if df is not None:
-                row = df.iloc[r]
-                return {k: ("" if pd.isna(v) else v) for k, v in row.to_dict().items()}
-        except Exception:
-            pass
-        # Fallback: build dict from model headers
-        out = {}
-        for c in range(model.columnCount()):
-            header = model.headerData(c, Qt.Horizontal, Qt.DisplayRole)
-            val = model.data(model.index(r, c), Qt.DisplayRole)
-            out[str(header).lower()] = val
-        return out
+        row = self._hist_df[self._hist_df["date"] == d]
+        if row.empty:
+            return None
+        row = row.iloc[0]
+        return {k: ("" if pd.isna(v) else v) for k, v in row.to_dict().items()}
+
+    def _on_day_selected(self):
+        # No-op for now; selection used by buttons
+        pass
+
+    def _rebuild_sorted(self):
+        self.sorted_list.clear()
+        if self._hist_df is None or self._hist_df.empty:
+            return
+        mode = self.sort_combo.currentText()
+        df = self._hist_df.copy()
+        if mode == "Minutes (desc)":
+            df = df.sort_values(["minutes","date"], ascending=[False, False])
+        elif mode == "Confidence (desc)":
+            df = df.sort_values(["confidence","date"], ascending=[False, False])
+        elif mode == "Progress (desc)":
+            df = df.sort_values(["progress","date"], ascending=[False, False])
+        else:
+            df = df.sort_values("date", ascending=False)
+        for _, r in df.iterrows():
+            item = QtWidgets.QListWidgetItem(f"{r['date']} — {str(r.get('topic',''))[:40]}")
+            item.setData(Qt.UserRole, r["date"])
+            self.sorted_list.addItem(item)
+
+    def _on_sorted_item(self, item: QtWidgets.QListWidgetItem):
+        d = item.data(Qt.UserRole)
+        if isinstance(d, dt.date):
+            self.calendar.setSelectedDate(QtCore.QDate(d.year, d.month, d.day))
 
     def open_details(self):
         data = self._selected_row_dict()
