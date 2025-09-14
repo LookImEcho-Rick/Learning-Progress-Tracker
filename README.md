@@ -1,6 +1,6 @@
 # Learning Progress Tracker
 
-A simple desktop app (PySide6) to log daily learning sessions, review history, and visualize progress over time. Data is stored locally in SQLite, with CSV import/export and automatic CSV sync.
+A simple desktop app (PySide6) to log daily learning sessions, review history, and visualize progress over time. Data is stored locally in SQLite, with JSON import/export and automatic JSON sync.
 
 ## Features
 - Log daily entries with topic, minutes, notes, challenges, wins, and confidence.
@@ -9,12 +9,12 @@ A simple desktop app (PySide6) to log daily learning sessions, review history, a
 - Insights: minutes per day, confidence trend, and progress score trend.
 - Weekly summary table (totals and averages).
 - Local SQLite storage in `data/tracker.db`.
- - Export data to CSV.
+ - Export data to JSON.
 - Automatic daily backups in `data/backups/`.
 - Tags for entries and tag-based filtering in History.
 - Streaks (current and longest) and weekly goal tracking.
 - Edit and delete past entries from the History page.
-- Import CSV (merge by date) with background validation; errors only if something's wrong.
+- Import JSON (merge by date) with background validation; errors only if something's wrong.
 
 ## Requirements
 - Python 3.10+
@@ -65,5 +65,6 @@ It also writes a best-effort daily backup to `data/backups/tracker-YYYYMMDD.db`.
 ## Notes
 - This repository ignores the local virtual environment (`.venv/`) and generated data files.
 - Validation: Topic ≤ 200 chars, Minutes 0–1440, Confidence 1–5, Tags up to 10 with 32 chars each. Long fields are truncated with a warning.
-- CSV sync: On launch, the app creates/updates a CSV in your Documents folder (`Documents/Learning Progress Tracker/entries.csv`) and imports from it if present. On exit, it saves the latest data back to the CSV automatically.
+- JSON sync: On launch, the app creates/updates a JSON file in your Documents folder (`Documents/Learning Progress Tracker/entries.json`) and imports from it if present. On exit, it saves the latest data back to JSON automatically.
+- Override sync path with env var `LPT_JSON_PATH` to point to a custom file.
 

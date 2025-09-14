@@ -5,6 +5,7 @@
 - Desktop: Added Settings tab to manage weekly goal minutes.
 - Insights: Added metrics header (this-week minutes vs goal, current streak, longest streak).
 - UI: Modern rounded dark theme via global stylesheet; improved spacing, placeholders, and accent buttons.
+- Sync: Prefer JSON for import/export and auto-sync; fallback to CSV for legacy files. UI switched to JSON and History/Data now show all entry fields (practiced, challenges, wins).
 
 ## [0.0.1] - 2025-09-14
 - Project initialized with documentation scaffolding.

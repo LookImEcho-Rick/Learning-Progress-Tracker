@@ -44,14 +44,15 @@
 - **Metrics:** Current streak, longest streak, and this-week minutes vs goal.
 
 ## Data Management
-- Export your data as CSV.
+- Export your data as JSON.
 - Automatic daily backups are stored locally.
-- Automatic CSV sync: the app reads from and writes to a CSV in your Documents folder (`Documents/Learning Progress Tracker/entries.csv`).
+- Automatic JSON sync: the app reads from and writes to a JSON file in your Documents folder (`Documents/Learning Progress Tracker/entries.json`).
+- Override sync path with env var `LPT_JSON_PATH` to point to a custom file.
 
 ### Importing Data
 - Go to the **Data** page.
-- Click "Import CSV" and select your file.
-- Required column: `date`. Optional: `topic, minutes, practiced, challenges, wins, confidence, tags`.
+- Click "Import JSON" and select your file.
+- JSON format: a list of entries where each entry is an object with `date` and optional `topic, minutes, practiced, challenges, wins, confidence, tags`.
 - The app validates in the background and imports automatically if valid.
 - If there are issues (e.g., missing dates or invalid values), an error panel shows details and nothing is saved.
 

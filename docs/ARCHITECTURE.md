@@ -23,20 +23,20 @@
 - `desktop/main.py` - PySide6 desktop app (Log, History, Insights, Data)
 - `services/storage.py` - database CRUD, export helpers, daily backups, settings
 - `services/metrics.py` - week index, progress score, derived fields, streaks & weekly helpers
-- `services/filesync.py` - CSV sync utilities
+- `services/filesync.py` - JSON sync utilities (CSV kept for compatibility)
 
 ## Data Flow
 1. On launch:
-   - Initialize DB and CSV sync (import if present, then write CSV).
+   - Initialize DB and JSON sync (import JSON if present, else fall back to CSV once; always write JSON).
    - Show Log Entry tab with today’s form.
 2. User saves entry - stored in DB.
 3. History tab lists entries with filters and edit/delete actions.
-4. Data tab provides CSV import/export (import validates then commits).
+4. Data tab provides JSON import/export (import validates then commits).
 
 ## Persistence and Backups
 - SQLite DB at `data/tracker.db`.
 - Daily backups are created under `data/backups/` as `tracker-YYYYMMDD.db` (best-effort on app start).
- - CSV sync: on app launch, the app imports from a user-visible CSV at `Documents/Learning Progress Tracker/entries.csv` if present, then writes the current DB to that CSV. On app exit, it saves again to the CSV (best-effort).
+ - JSON sync: on app launch, the app imports from a user-visible JSON at `Documents/Learning Progress Tracker/entries.json` if present (or falls back to CSV once), then writes the current DB to JSON. On app exit, it saves again to JSON (best-effort).
 
 ## Settings
 - Simple key/value `settings` table.
